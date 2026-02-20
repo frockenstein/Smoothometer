@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!-- Required: explains why we need motion data -->
+    <key>NSMotionUsageDescription</key>
+    <string>Smoothometer uses the accelerometer to measure G-forces while driving so it can alert you when braking or cornering too hard.</string>
+
+    <!-- Lock to portrait only — prevents gauge rotation when the car turns -->
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+    </array>
+
+    <!-- App display name -->
+    <key>CFBundleDisplayName</key>
+    <string>Smoothometer</string>
+</dict>
+</plist>
