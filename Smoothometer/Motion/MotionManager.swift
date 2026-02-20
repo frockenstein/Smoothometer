@@ -3,8 +3,17 @@ import Observation
 
 @Observable
 final class MotionManager {
-    var filteredX: Double = 0.0  // lateral: positive = right
-    var filteredY: Double = 0.0  // longitudinal: positive = forward (braking)
+    // Raw filtered values from accelerometer
+    private(set) var filteredX: Double = 0.0
+    private(set) var filteredY: Double = 0.0
+
+    // Calibration offsets — captured when car is still
+    private var calibrationX: Double = 0.0
+    private var calibrationY: Double = 0.0
+
+    // Calibration-corrected values — use these for the dot position
+    var calibratedX: Double { filteredX - calibrationX }
+    var calibratedY: Double { filteredY - calibrationY }
 
     private let motionManager = CMMotionManager()
     private var filterX = LowPassFilter(factor: 0.15)
@@ -25,5 +34,12 @@ final class MotionManager {
 
     func stop() {
         motionManager.stopAccelerometerUpdates()
+    }
+
+    /// Capture current filtered values as the zero point.
+    /// Call this when the car is stationary so the dot sits at center.
+    func calibrate() {
+        calibrationX = filteredX
+        calibrationY = filteredY
     }
 }

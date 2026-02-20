@@ -6,14 +6,15 @@ struct ContentView: View {
     @State private var isSettingsPresented = false
     @State private var isBreached = false
     @State private var alertManager: AlertManager?
+    @State private var isCalibrating = true
 
     private var maxDotTravel: Double {
         settings.ringRadius - DotView.diameter / 2
     }
 
     private var dotOffset: CGSize {
-        let x = motion.filteredX.clamped(to: -2.0...2.0)
-        let y = motion.filteredY.clamped(to: -2.0...2.0)
+        let x = motion.calibratedX.clamped(to: -2.0...2.0)
+        let y = motion.calibratedY.clamped(to: -2.0...2.0)
         return CGSize(
             width:  x * maxDotTravel,
             height: -y * maxDotTravel
@@ -36,26 +37,58 @@ struct ContentView: View {
                 settings: settings
             )
 
-            Button {
-                isSettingsPresented = true
-            } label: {
-                Image(systemName: "gearshape.fill")
-                    .font(.title2)
-                    .foregroundStyle(.white.opacity(0.6))
-                    .padding(20)
+            // Gear icon — hidden during calibration
+            if !isCalibrating {
+                Button {
+                    isSettingsPresented = true
+                } label: {
+                    Image(systemName: "gearshape.fill")
+                        .font(.title2)
+                        .foregroundStyle(.white.opacity(0.6))
+                        .padding(20)
+                }
+                .transition(.opacity)
+            }
+
+            // Calibrating overlay — covers the gauge while the filter settles
+            if isCalibrating {
+                ZStack {
+                    Color.black.ignoresSafeArea()
+                    VStack(spacing: 16) {
+                        ProgressView()
+                            .tint(.white)
+                            .scaleEffect(1.4)
+                        Text("Calibrating")
+                            .foregroundStyle(.white)
+                            .font(.headline)
+                        Text("Hold the phone still")
+                            .foregroundStyle(.white.opacity(0.6))
+                            .font(.subheadline)
+                    }
+                }
+                .transition(.opacity)
             }
         }
         .preferredColorScheme(.dark)
         .statusBarHidden(true)
         .persistentSystemOverlays(.hidden)
         .sheet(isPresented: $isSettingsPresented) {
-            SettingsSheetView(settings: settings)
-                .presentationDetents([.medium, .large])
+            SettingsSheetView(settings: settings, onRecalibrate: {
+                motion.calibrate()
+            })
+            .presentationDetents([.medium, .large])
         }
         .onAppear {
             alertManager = AlertManager(settings: settings)
             motion.start()
             UIApplication.shared.isIdleTimerDisabled = true
+
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                motion.calibrate()
+                withAnimation(.easeOut(duration: 0.4)) {
+                    isCalibrating = false
+                }
+            }
         }
         .onDisappear {
             motion.stop()

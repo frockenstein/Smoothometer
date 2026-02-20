@@ -2,7 +2,8 @@ import SwiftUI
 import AudioToolbox
 
 struct SettingsSheetView: View {
-    @Bindable var settings: AppSettings  // @Bindable needed for $settings.xxx bindings
+    @Bindable var settings: AppSettings
+    var onRecalibrate: () -> Void
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -36,6 +37,18 @@ struct SettingsSheetView: View {
                         settings.resetRingRadius()
                     }
                     .foregroundStyle(.red)
+                }
+
+                Section("Calibration") {
+                    Button {
+                        onRecalibrate()
+                        dismiss()
+                    } label: {
+                        Label("Re-zero Dot", systemImage: "scope")
+                    }
+                    Text("Park the car, wait a moment, then tap to re-zero the dot to center. Also done automatically 2 seconds after launch.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 Section {
