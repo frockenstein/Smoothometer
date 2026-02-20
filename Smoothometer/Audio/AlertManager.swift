@@ -1,7 +1,7 @@
 import AudioToolbox
 import UIKit
 
-final class AlertManager: ObservableObject {
+final class AlertManager {
     private let cooldownDuration: TimeInterval = 2.0
     private var lastAlertTime: Date = .distantPast
     private let settings: AppSettings

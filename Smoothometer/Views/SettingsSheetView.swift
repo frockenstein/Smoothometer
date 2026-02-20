@@ -2,7 +2,7 @@ import SwiftUI
 import AudioToolbox
 
 struct SettingsSheetView: View {
-    @ObservedObject var settings: AppSettings
+    @Bindable var settings: AppSettings  // @Bindable needed for $settings.xxx bindings
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {

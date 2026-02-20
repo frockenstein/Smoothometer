@@ -1,24 +1,27 @@
 import SwiftUI
 import AudioToolbox
+import Observation
 
-final class AppSettings: ObservableObject {
-    var objectWillChange: ObservableObjectPublisher
-    
+@Observable
+final class AppSettings {
 
-    // Ring radius in SwiftUI points. Default 120pt is visually comfortable.
-    @AppStorage("ringRadius") var ringRadius: Double = 120.0
-
-    // Bounds for pinch gesture clamping
     static let minRingRadius: Double = 50.0
     static let maxRingRadius: Double = 220.0
 
-    // SystemSoundID stored as Int for @AppStorage compatibility
-    @AppStorage("selectedSoundID") var selectedSoundID: Int = 1052
+    var ringRadius: Double {
+        didSet { UserDefaults.standard.set(ringRadius, forKey: "ringRadius") }
+    }
 
-    @AppStorage("hapticsEnabled") var hapticsEnabled: Bool = true
+    var selectedSoundID: Int {
+        didSet { UserDefaults.standard.set(selectedSoundID, forKey: "selectedSoundID") }
+    }
+
+    var hapticsEnabled: Bool {
+        didSet { UserDefaults.standard.set(hapticsEnabled, forKey: "hapticsEnabled") }
+    }
 
     struct SoundOption: Identifiable {
-        let id: Int  // SystemSoundID raw value
+        let id: Int
         let name: String
     }
 
@@ -30,6 +33,12 @@ final class AppSettings: ObservableObject {
         SoundOption(id: 1108, name: "Glass"),
         SoundOption(id: 1011, name: "Sent Message"),
     ]
+
+    init() {
+        ringRadius   = UserDefaults.standard.object(forKey: "ringRadius")    as? Double ?? 120.0
+        selectedSoundID = UserDefaults.standard.object(forKey: "selectedSoundID") as? Int ?? 1052
+        hapticsEnabled  = UserDefaults.standard.object(forKey: "hapticsEnabled")  as? Bool ?? true
+    }
 
     func resetRingRadius() {
         ringRadius = 120.0
