@@ -61,7 +61,7 @@ struct SettingsSheetView: View {
                     }
                     // Controls the k constant in the sigmoid response curve.
                     // Low = subtle reaction; High = very responsive to small forces.
-                    Slider(value: $settings.sensitivity, in: 1...10, step: 1)
+                    Slider(value: $settings.sensitivity, in: 5...15, step: 1)
                     HStack {
                         Text("Subtle")
                             .font(.caption)
