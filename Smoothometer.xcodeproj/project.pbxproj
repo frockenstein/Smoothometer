@@ -256,6 +256,7 @@
 				DEVELOPMENT_TEAM = EBUBW4Q4F8;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Smoothometer tracks your route and marks where hard braking or cornering occurs on the drive map.";
 				INFOPLIST_KEY_NSMotionUsageDescription = "Smoothometer uses the accelerometer to measure G-forces while driving.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -290,6 +291,7 @@
 				DEVELOPMENT_TEAM = EBUBW4Q4F8;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Smoothometer tracks your route and marks where hard braking or cornering occurs on the drive map.";
 				INFOPLIST_KEY_NSMotionUsageDescription = "Smoothometer uses the accelerometer to measure G-forces while driving.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;

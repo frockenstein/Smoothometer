@@ -3,10 +3,9 @@ import SwiftUI
 /// Root view of Smoothometer. Owns all state and wires the subsystems together.
 ///
 /// Responsibilities:
-///   - Holds the MotionManager, AppSettings, and AlertManager instances
-///   - Converts raw calibrated G-force values into a dot offset using the
-///     sigmoid response curve
-///   - Detects when the dot breaches the threshold ring and fires the alert
+///   - Holds MotionManager, LocationManager, AppSettings, AlertManager, BreachStore
+///   - Converts raw calibrated G-force values into a dot offset using the sigmoid response curve
+///   - Detects when the dot breaches the threshold ring, fires the alert, and records the location
 ///   - Shows a calibration overlay on launch while the sensor filter settles
 ///   - Keeps the screen awake while active (idle timer disabled)
 struct ContentView: View {
@@ -16,11 +15,20 @@ struct ContentView: View {
     /// Streams accelerometer data and exposes calibrated X/Y G-force values.
     @State private var motion = MotionManager()
 
+    /// Streams GPS location and accumulates the driven route polyline.
+    @State private var locationManager = LocationManager()
+
     /// User-adjustable preferences (ring size, sensitivity, sound, haptics).
     @State private var settings = AppSettings()
 
+    /// Persists the list of GPS coordinates where breaches occurred.
+    @State private var breachStore = BreachStore()
+
     /// Controls visibility of the settings bottom sheet.
     @State private var isSettingsPresented = false
+
+    /// Controls visibility of the drive map full-screen cover.
+    @State private var isMapPresented = false
 
     /// True while the dot's edge is at or beyond the threshold ring edge.
     /// Drives the ring's breach colour and triggers AlertManager.
@@ -52,9 +60,9 @@ struct ContentView: View {
     ///
     /// This mimics how a car feels — small bumps barely register, genuine braking
     /// or cornering forces produce a clear movement, and the dot never flies off screen.
-    /// `k` (sensitivity 1–10) controls how steeply the middle section rises.
+    /// `k` (sensitivity 1–15) controls how steeply the middle section rises.
     private func applyResponse(_ value: Double) -> Double {
-        let k = settings.sensitivity          // user-controlled steepness (1–10)
+        let k = settings.sensitivity          // user-controlled steepness (1–15)
         let shaped = value * abs(value)       // sign(x)·x²: compresses tiny inputs
         return tanh(k * shaped)              // saturates smoothly toward ±1
     }
@@ -89,7 +97,7 @@ struct ContentView: View {
     // MARK: - Body
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
+        ZStack {
 
             // Main gauge — always rendered so it's ready the instant calibration ends.
             GaugePadView(
@@ -98,16 +106,34 @@ struct ContentView: View {
                 settings: settings
             )
 
-            // Gear icon fades in after calibration so the driver isn't prompted
-            // to open settings while the dot is still settling.
+            // Top button bar — map icon top-left, gear icon top-right.
+            // Hidden during calibration so the driver isn't distracted while holding still.
             if !isCalibrating {
-                Button {
-                    isSettingsPresented = true
-                } label: {
-                    Image(systemName: "gearshape.fill")
-                        .font(.title2)
-                        .foregroundStyle(.white.opacity(0.6))
-                        .padding(20)
+                VStack {
+                    HStack {
+                        // Map button — opens the drive map full-screen cover.
+                        Button {
+                            isMapPresented = true
+                        } label: {
+                            Image(systemName: "map.fill")
+                                .font(.title2)
+                                .foregroundStyle(.white.opacity(0.6))
+                                .padding(20)
+                        }
+
+                        Spacer()
+
+                        // Settings button — opens the settings bottom sheet.
+                        Button {
+                            isSettingsPresented = true
+                        } label: {
+                            Image(systemName: "gearshape.fill")
+                                .font(.title2)
+                                .foregroundStyle(.white.opacity(0.6))
+                                .padding(20)
+                        }
+                    }
+                    Spacer()
                 }
                 .transition(.opacity)
             }
@@ -144,11 +170,18 @@ struct ContentView: View {
             .presentationDetents([.medium, .large])
         }
 
+        // Drive map — full-screen so the map has maximum space.
+        .fullScreenCover(isPresented: $isMapPresented) {
+            DriveMapView(locationManager: locationManager, breachStore: breachStore)
+        }
+
         .onAppear {
             // Wire up the alert manager with the live settings instance.
             alertManager = AlertManager(settings: settings)
             // Start the accelerometer stream.
             motion.start()
+            // Request location permission and start GPS tracking.
+            locationManager.requestAndStart()
             // Prevent the screen from sleeping while the app is open.
             UIApplication.shared.isIdleTimerDisabled = true
 
@@ -165,6 +198,7 @@ struct ContentView: View {
 
         .onDisappear {
             motion.stop()
+            locationManager.stop()
             // Re-enable the idle timer so the screen can sleep normally
             // when the app is in the background or closed.
             UIApplication.shared.isIdleTimerDisabled = false
@@ -178,6 +212,19 @@ struct ContentView: View {
             if breached {
                 // AlertManager internally rate-limits to one alert per 2 seconds.
                 alertManager?.triggerIfReady()
+            }
+        }
+
+        // Watch for the false → true transition of isBreached.
+        // Only records the breach location on the leading edge (first frame of contact),
+        // not on every subsequent frame while the dot stays outside the ring.
+        .onChange(of: isBreached) { wasBreached, nowBreached in
+            if !wasBreached && nowBreached,
+               let location = locationManager.currentLocation {
+                breachStore.record(
+                    latitude: location.coordinate.latitude,
+                    longitude: location.coordinate.longitude
+                )
             }
         }
     }
