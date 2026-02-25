@@ -1,5 +1,6 @@
 import SwiftUI
 import MapKit
+import CoreLocation
 
 /// Full-screen map showing the route driven this session and all recorded breach locations.
 ///
@@ -105,7 +106,7 @@ struct DriveMapView: View {
             Label("\(locationManager.routeCoordinates.count) GPS pts", systemImage: "location.fill")
             Divider().frame(height: 14)
             Label("\(breachStore.events.count) breach(es)", systemImage: "exclamationmark.circle.fill")
-                .foregroundStyle(breachStore.events.isEmpty ? .secondary : .red)
+                .foregroundStyle(breachStore.events.isEmpty ? Color.secondary : Color.red)
         }
         .font(.caption)
         .foregroundStyle(.secondary)

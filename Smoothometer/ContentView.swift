@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreLocation
 
 /// Root view of Smoothometer. Owns all state and wires the subsystems together.
 ///
