@@ -82,14 +82,14 @@ struct ContentView: View {
     ///   - Drifts back to centre slowly once force is removed
     ///
     /// Tuning knobs:
-    ///   forceFactor = sensitivity × 0.6  (scales with the sensitivity slider)
-    ///   springK     = 2.5   (stronger restoring spring — snappier return to centre)
-    ///   damping     = 0.90  (per-frame velocity multiplier — momentum feel)
+    ///   forceFactor = sensitivity × 1.2  (scaled up to match stiffer spring)
+    ///   springK     = 5.0   (2× stiffer — snaps back to centre quickly)
+    ///   damping     = 0.94  (less friction — crisper response, more momentum)
     private func stepPhysics() {
         let dt          = 1.0 / 60.0
-        let forceFactor = settings.sensitivity * 0.6   // sensitivity slider drives responsiveness
-        let springK     = 2.5                           // stronger spring — snappier return to centre
-        let damping     = 0.90                          // velocity decay per frame
+        let forceFactor = settings.sensitivity * 1.2   // scaled up to match stiffer spring
+        let springK     = 5.0                           // 2× stiffer — snaps back to centre quickly
+        let damping     = 0.94                          // less friction — crisper response, more momentum
 
         // Accelerometer force minus spring restoring force → velocity change
         velX += (motion.calibratedX * forceFactor - springK * dotX) * dt
