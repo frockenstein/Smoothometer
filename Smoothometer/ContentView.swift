@@ -83,12 +83,12 @@ struct ContentView: View {
     ///
     /// Tuning knobs:
     ///   forceFactor = sensitivity × 0.6  (scales with the sensitivity slider)
-    ///   springK     = 0.8   (weak restoring spring — slow return to centre)
+    ///   springK     = 2.5   (stronger restoring spring — snappier return to centre)
     ///   damping     = 0.90  (per-frame velocity multiplier — momentum feel)
     private func stepPhysics() {
         let dt          = 1.0 / 60.0
         let forceFactor = settings.sensitivity * 0.6   // sensitivity slider drives responsiveness
-        let springK     = 0.8                           // gentle spring — cup-of-liquid feel
+        let springK     = 2.5                           // stronger spring — snappier return to centre
         let damping     = 0.90                          // velocity decay per frame
 
         // Accelerometer force minus spring restoring force → velocity change
@@ -225,8 +225,6 @@ struct ContentView: View {
         }
 
         .onAppear {
-            // Wire up the alert manager with the live settings instance.
-            alertManager = AlertManager(settings: settings)
             // Start the accelerometer stream.
             motion.start()
             // Request location permission and start GPS tracking.
@@ -240,6 +238,9 @@ struct ContentView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                 motion.calibrate()
                 resetPhysics()              // clear any pre-calibration drift
+                // Create the alert manager only now — keeps it nil during the settling
+                // window so no sound or haptic can fire before the dot is at zero.
+                alertManager = AlertManager(settings: settings)
                 withAnimation(.easeOut(duration: 0.4)) {
                     isCalibrating = false
                 }
