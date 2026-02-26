@@ -43,6 +43,10 @@ struct ContentView: View {
     /// Hides the gauge and shows a "Calibrating" overlay instead.
     @State private var isCalibrating = true
 
+    /// When true, the live debug HUD is shown at the bottom of the screen.
+    /// Toggled by the waveform button in the toolbar. Dev/tuning use only.
+    @State private var showDebugHUD = false
+
     // MARK: - Physics state
 
     /// Normalised dot position on the X axis (−1 … 1, right = positive).
@@ -171,6 +175,16 @@ struct ContentView: View {
 
                         Spacer()
 
+                        // Debug HUD toggle — shows live accelerometer/physics data.
+                        Button {
+                            showDebugHUD.toggle()
+                        } label: {
+                            Image(systemName: "waveform.path.ecg")
+                                .font(.title2)
+                                .foregroundStyle(showDebugHUD ? Color.yellow : Color.white.opacity(0.6))
+                                .padding(20)
+                        }
+
                         // Settings button — opens the settings bottom sheet.
                         Button {
                             isSettingsPresented = true
@@ -182,6 +196,29 @@ struct ContentView: View {
                         }
                     }
                     Spacer()
+                }
+                .transition(.opacity)
+            }
+
+            // Live debug HUD — pinned to the bottom of the screen.
+            // Shows raw G-force, physics state, and distance vs. threshold
+            // so you can correlate what you feel in the car with the numbers.
+            if showDebugHUD && !isCalibrating {
+                VStack {
+                    Spacer()
+                    DebugHUDView(
+                        calibX:    motion.calibratedX,
+                        calibY:    motion.calibratedY,
+                        dotX:      dotX,
+                        dotY:      dotY,
+                        velX:      velX,
+                        velY:      velY,
+                        distance:  dotDistanceFromCenter,
+                        threshold: breachThreshold,
+                        isBreached: isBreached
+                    )
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 20)
                 }
                 .transition(.opacity)
             }
