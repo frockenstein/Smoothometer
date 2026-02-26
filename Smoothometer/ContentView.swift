@@ -5,7 +5,7 @@ import CoreLocation
 ///
 /// Responsibilities:
 ///   - Holds MotionManager, LocationManager, AppSettings, AlertManager, BreachStore
-///   - Converts raw calibrated G-force values into a dot offset using the sigmoid response curve
+///   - Runs a spring-damper physics simulation to move the dot with inertia
 ///   - Detects when the dot breaches the threshold ring, fires the alert, and records the location
 ///   - Shows a calibration overlay on launch while the sensor filter settles
 ///   - Keeps the screen awake while active (idle timer disabled)
@@ -43,6 +43,21 @@ struct ContentView: View {
     /// Hides the gauge and shows a "Calibrating" overlay instead.
     @State private var isCalibrating = true
 
+    // MARK: - Physics state
+
+    /// Normalised dot position on the X axis (−1 … 1, right = positive).
+    /// Driven by the spring-damper simulation, not mapped directly from the accelerometer.
+    @State private var dotX: Double = 0.0
+
+    /// Normalised dot position on the Y axis (−1 … 1, up = positive).
+    @State private var dotY: Double = 0.0
+
+    /// Current dot velocity along X, in normalised units per second.
+    @State private var velX: Double = 0.0
+
+    /// Current dot velocity along Y, in normalised units per second.
+    @State private var velY: Double = 0.0
+
     // MARK: - Computed geometry
 
     /// Maximum distance the dot centre can travel from the screen centre, in points.
@@ -51,35 +66,67 @@ struct ContentView: View {
         settings.ringRadius - DotView.diameter / 2
     }
 
-    // MARK: - Response curve
+    // MARK: - Physics simulation
 
-    /// Maps a raw calibrated G-force value to a normalised dot position (−1 … 1)
-    /// using a sigmoid-shaped response curve:
+    /// Advances the spring-damper model one frame (Δt = 1/60 s).
     ///
-    ///   shaped = x · |x|   →  sign-preserving quadratic: slow near zero, grows quickly
-    ///   output = tanh(k · shaped)  →  smooth saturation toward ±1 at high G
+    /// Model:
+    ///   force    = calibratedAccel × forceFactor   — accelerometer drives the dot
+    ///   velΔ     = (force − springK × pos) × dt    — spring pulls back to centre
+    ///   vel     *= damping                          — friction / fluid resistance
+    ///   pos     += vel × dt                         — integrate position
     ///
-    /// This mimics how a car feels — small bumps barely register, genuine braking
-    /// or cornering forces produce a clear movement, and the dot never flies off screen.
-    /// `k` (sensitivity 1–15) controls how steeply the middle section rises.
-    private func applyResponse(_ value: Double) -> Double {
-        let k = settings.sensitivity          // user-controlled steepness (1–15)
-        let shaped = value * abs(value)       // sign(x)·x²: compresses tiny inputs
-        return tanh(k * shaped)              // saturates smoothly toward ±1
+    /// Feel targets:
+    ///   - Sluggish at rest, like liquid in a cup — dot doesn't snap instantly
+    ///   - Builds momentum under sustained G so it slides toward the ring
+    ///   - Drifts back to centre slowly once force is removed
+    ///
+    /// Tuning knobs:
+    ///   forceFactor = sensitivity × 0.6  (scales with the sensitivity slider)
+    ///   springK     = 0.8   (weak restoring spring — slow return to centre)
+    ///   damping     = 0.90  (per-frame velocity multiplier — momentum feel)
+    private func stepPhysics() {
+        let dt          = 1.0 / 60.0
+        let forceFactor = settings.sensitivity * 0.6   // sensitivity slider drives responsiveness
+        let springK     = 0.8                           // gentle spring — cup-of-liquid feel
+        let damping     = 0.90                          // velocity decay per frame
+
+        // Accelerometer force minus spring restoring force → velocity change
+        velX += (motion.calibratedX * forceFactor - springK * dotX) * dt
+        velY += (motion.calibratedY * forceFactor - springK * dotY) * dt
+
+        // Apply damping — models friction and fluid drag
+        velX *= damping
+        velY *= damping
+
+        // Integrate velocity into position
+        dotX += velX * dt
+        dotY += velY * dt
+
+        // Hard stop at ring boundary — kill outward velocity so the dot
+        // doesn't stick to the edge while the spring is recalling it.
+        if dotX >  1.0 { dotX =  1.0; velX = min(velX, 0) }
+        if dotX < -1.0 { dotX = -1.0; velX = max(velX, 0) }
+        if dotY >  1.0 { dotY =  1.0; velY = min(velY, 0) }
+        if dotY < -1.0 { dotY = -1.0; velY = max(velY, 0) }
+    }
+
+    /// Resets physics to the resting state — called on calibration so the dot
+    /// snaps to centre rather than carrying stale velocity into the new baseline.
+    private func resetPhysics() {
+        dotX = 0; dotY = 0; velX = 0; velY = 0
     }
 
     // MARK: - Dot position
 
-    /// Screen-space offset of the dot from the centre of the gauge, in points.
-    /// X maps to lateral force (right = positive), Y is negated because SwiftUI's
-    /// Y axis increases downward while braking (positive accelerometer Y) should
-    /// move the dot upward toward the top of the screen.
+    /// Screen-space offset of the dot from the gauge centre, in points.
+    /// Derived from physics state (dotX, dotY) scaled by maxDotTravel.
+    /// Y is negated because SwiftUI's Y axis increases downward, but positive
+    /// accelerometer Y (braking) should push the dot toward the top of the screen.
     private var dotOffset: CGSize {
-        let x = applyResponse(motion.calibratedX)
-        let y = applyResponse(motion.calibratedY)
-        return CGSize(
-            width:  x * maxDotTravel,
-            height: -y * maxDotTravel
+        CGSize(
+            width:  dotX * maxDotTravel,
+            height: -dotY * maxDotTravel
         )
     }
 
@@ -166,6 +213,7 @@ struct ContentView: View {
         // Settings sheet — medium detent by default, expandable to full height.
         .sheet(isPresented: $isSettingsPresented) {
             SettingsSheetView(settings: settings, onRecalibrate: {
+                resetPhysics()              // clear velocity so the dot doesn't carry momentum into new baseline
                 motion.calibrate()
             })
             .presentationDetents([.medium, .large])
@@ -187,10 +235,11 @@ struct ContentView: View {
             UIApplication.shared.isIdleTimerDisabled = true
 
             // Wait 2 seconds for the low-pass filter to converge on the true
-            // resting values, then snapshot those as the calibration baseline
-            // and fade out the overlay.
+            // resting values, then snapshot those as the calibration baseline,
+            // reset physics to rest, and fade out the overlay.
             DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                 motion.calibrate()
+                resetPhysics()              // clear any pre-calibration drift
                 withAnimation(.easeOut(duration: 0.4)) {
                     isCalibrating = false
                 }
@@ -205,8 +254,15 @@ struct ContentView: View {
             UIApplication.shared.isIdleTimerDisabled = false
         }
 
-        // Evaluated every frame at 60 Hz while the accelerometer is running.
-        // Updates breach state and fires the alert when the dot hits the ring.
+        // Advance physics on every accelerometer sample (60 Hz).
+        // Skipped while calibrating so stale sensor data doesn't pre-load velocity.
+        .onChange(of: motion.calibratedX) { _, _ in
+            guard !isCalibrating else { return }
+            stepPhysics()
+        }
+
+        // Evaluated every frame after physics updates dotX/dotY.
+        // Updates breach state and fires the alert when the dot reaches the ring.
         .onChange(of: dotDistanceFromCenter) { _, distance in
             let breached = distance >= breachThreshold
             isBreached = breached
