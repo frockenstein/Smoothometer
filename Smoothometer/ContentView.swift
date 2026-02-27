@@ -22,7 +22,7 @@ struct ContentView: View {
     /// User-adjustable preferences (ring size, sensitivity, sound, haptics).
     @State private var settings = AppSettings()
 
-    /// Persists the list of GPS coordinates where breaches occurred.
+    /// Persists the list of GPS coordinates where breaches occurred.s
     @State private var breachStore = BreachStore()
 
     /// Controls visibility of the settings bottom sheet.
@@ -155,6 +155,7 @@ struct ContentView: View {
             GaugePadView(
                 dotOffset: dotOffset,
                 isBreached: isBreached,
+                proximity: min(dotDistanceFromCenter / max(breachThreshold, 1), 1.0),
                 settings: settings
             )
 

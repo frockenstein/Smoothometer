@@ -20,6 +20,10 @@ struct GaugePadView: View {
     /// Forwarded to ThresholdRingView to drive its breach colour.
     let isBreached: Bool
 
+    /// 0.0 = dot at centre; 1.0 = dot touching the ring.
+    /// Forwarded to DotView to drive its heat-map colour and glow.
+    let proximity: Double
+
     /// Shared settings — read for ring radius, written during pinch gesture.
     /// No property wrapper needed because AppSettings uses @Observable.
     var settings: AppSettings
@@ -45,7 +49,7 @@ struct GaugePadView: View {
                 ThresholdRingView(radius: settings.ringRadius, isBreached: isBreached)
 
                 // The G-force bubble. Offset is applied from the ZStack's centre.
-                DotView()
+                DotView(proximity: proximity)
                     .offset(dotOffset)
             }
             // Make the full canvas hit-testable so the pinch gesture works
